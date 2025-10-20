@@ -1,4 +1,6 @@
-[![RideGrid Banner](https://via.placeholder.com/1200x300/0B1021/7C3AED?text=RideGrid+%7C+Planet-Scale+Ride-Hailing)](https://github.com/)
+# RideGrid
+
+![RideGrid Logo](images/ridegrid_logo.png "RideGrid - Your City, Your Ride")
 
 # RideGrid — A Playbook for Planet-Scale Ride-Hailing
 
