@@ -1,0 +1,108 @@
+# OpenTelemetry Collector Configuration for RideGrid
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "*"
+  
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  memory_limiter:
+    limit_mib: 512
+
+  resource:
+    attributes:
+      - key: service.name
+        value: ridegrid-otel-collector
+        action: upsert
+      - key: service.version
+        value: 1.0.0
+        action: upsert
+      - key: deployment.environment
+        value: development
+        action: upsert
+
+  # Add correlation IDs and trace context
+  transform:
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["ridegrid.correlation_id"], attributes["correlation_id"]) where attributes["correlation_id"] != nil
+          - set(attributes["ridegrid.ride_id"], attributes["ride_id"]) where attributes["ride_id"] != nil
+          - set(attributes["ridegrid.driver_id"], attributes["driver_id"]) where attributes["driver_id"] != nil
+
+  # Sample traces for high volume
+  probabilistic_sampler:
+    sampling_percentage: 10
+
+exporters:
+  # Prometheus metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      environment: development
+      cluster: ridegrid-dev
+
+  # Console logging for development
+  logging:
+    loglevel: info
+    development: true
+
+  # Jaeger for traces (optional)
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # OTLP HTTP for external systems
+  otlphttp:
+    endpoint: "http://tempo:4318"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, transform, probabilistic_sampler, batch]
+      exporters: [logging, jaeger]
+    
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, logging]
+    
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging]
+
+  extensions: [health_check, pprof]
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  zpages:
+    endpoint: 0.0.0.0:55679

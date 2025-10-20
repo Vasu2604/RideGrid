@@ -1,0 +1,217 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+gateway:
+  replicaCount: 3
+  image:
+    repository: ridegrid/gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: ridegrid-secrets
+          key: database-url
+    - name: REDIS_URL
+      value: "redis://ridegrid-redis:6379"
+    - name: KAFKA_BOOTSTRAP_SERVERS
+      value: "ridegrid-kafka:9092"
+
+telemetryIngest:
+  replicaCount: 3
+  image:
+    repository: ridegrid/telemetry-ingest
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8000
+    protocol: TCP
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+matchingEngine:
+  replicaCount: 3
+  image:
+    repository: ridegrid/matching-engine
+    tag: latest
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  keda:
+    enabled: true
+    pollingInterval: 30
+    cooldownPeriod: 300
+    minReplicaCount: 3
+    maxReplicaCount: 20
+    triggers:
+      - type: kafka
+        metadata:
+          bootstrapServers: ridegrid-kafka:9092
+          consumerGroup: matching-engine-group
+          topic: ride_requests.v1
+          lagThreshold: "50"
+
+assignmentOrchestrator:
+  replicaCount: 3
+  image:
+    repository: ridegrid/assignment-orchestrator
+    tag: latest
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+stateQuery:
+  replicaCount: 3
+  image:
+    repository: ridegrid/state-query
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+opsConsole:
+  replicaCount: 2
+  image:
+    repository: ridegrid/ops-console
+    tag: latest
+  service:
+    type: LoadBalancer
+    port: 3000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+postgresql:
+  enabled: true
+  auth:
+    username: ridegrid
+    password: "REPLACE_ME_POSTGRES_PASSWORD" # set via Helm --set or Kubernetes secret
+    database: ridegrid
+  primary:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 20Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+
+kafka:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  persistence:
+    enabled: true
+    size: 20Gi
+
+prometheus:
+  enabled: true
+  server:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+grafana:
+  enabled: true
+  adminPassword: "REPLACE_ME_GRAFANA_ADMIN_PASSWORD" # override via Helm or secret
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+argoRollouts:
+  enabled: true
+  strategy:
+    canary:
+      steps:
+        - setWeight: 5
+        - pause: {duration: 30s}
+        - setWeight: 25
+        - pause: {duration: 1m}
+        - setWeight: 50
+        - pause: {duration: 2m}
+        - setWeight: 100
+      analysis:
+        templates:
+          - templateName: success-rate
+        args:
+          - name: service-name
+            value: gateway
+
+
+
+
+

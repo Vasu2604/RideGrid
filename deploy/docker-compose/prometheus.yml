@@ -1,0 +1,203 @@
+# Prometheus Configuration for RideGrid
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ridegrid-dev'
+    environment: 'development'
+
+rule_files:
+  - "/etc/prometheus/alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # RideGrid Gateway Service
+  - job_name: 'ridegrid-gateway'
+    static_configs:
+      - targets: ['gateway:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # RideGrid Telemetry Ingest Service
+  - job_name: 'ridegrid-telemetry-ingest'
+    static_configs:
+      - targets: ['telemetry-ingest:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # RideGrid Matching Engine
+  - job_name: 'ridegrid-matching-engine'
+    static_configs:
+      - targets: ['matching-engine:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # RideGrid Assignment Orchestrator
+  - job_name: 'ridegrid-assignment-orchestrator'
+    static_configs:
+      - targets: ['assignment-orchestrator:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # RideGrid State Query Service
+  - job_name: 'ridegrid-state-query'
+    static_configs:
+      - targets: ['state-query:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 5s
+
+  # PostgreSQL Exporter (if added)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Redis Exporter (if added)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Kafka/Redpanda Exporter (if added)
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Node Exporter (if running on host)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # cAdvisor (container metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+# Recording rules for performance calculations
+recording_rules:
+  - name: ridegrid.performance
+    interval: 30s
+    rules:
+      # Request rate per service
+      - record: ridegrid:http_request_rate_5m
+        expr: rate(http_requests_total[5m])
+        labels:
+          aggregation: rate_5m
+
+      # Error rate per service
+      - record: ridegrid:http_error_rate_5m
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+        labels:
+          aggregation: error_rate_5m
+
+      # P95 latency per service
+      - record: ridegrid:http_request_duration_p95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+        labels:
+          quantile: "0.95"
+
+      # P99 latency per service
+      - record: ridegrid:http_request_duration_p99
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+        labels:
+          quantile: "0.99"
+
+      # Kafka consumer lag
+      - record: ridegrid:kafka_consumer_lag
+        expr: kafka_consumer_lag_sum
+        labels:
+          aggregation: consumer_lag
+
+      # Redis hit rate
+      - record: ridegrid:redis_hit_rate
+        expr: redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)
+        labels:
+          aggregation: hit_rate
+
+      # Database connection pool usage
+      - record: ridegrid:db_pool_usage
+        expr: db_connections_active / db_connections_max
+        labels:
+          aggregation: pool_usage
+
+      # Ride matching success rate
+      - record: ridegrid:ride_matching_success_rate_5m
+        expr: rate(ride_matches_total{status="success"}[5m]) / rate(ride_matches_total[5m])
+        labels:
+          aggregation: success_rate_5m
+
+      # Assignment acceptance rate
+      - record: ridegrid:assignment_acceptance_rate_5m
+        expr: rate(assignments_total{status="accepted"}[5m]) / rate(assignments_total[5m])
+        labels:
+          aggregation: acceptance_rate_5m
+
+      # Queue depth by topic
+      - record: ridegrid:kafka_queue_depth
+        expr: kafka_topic_partition_current_offset - kafka_consumer_group_lag
+        labels:
+          aggregation: queue_depth
+
+# Remote write configuration (for production)
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint"
+#     queue_config:
+#       max_samples_per_send: 1000
+#       max_shards: 200
+#       capacity: 2500
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 7d
+    retention.size: 10GB
+    wal-compression: true
+
+# Query configuration
+query:
+  max_concurrency: 20
+  timeout: 2m
+  max_samples: 50000000
+
+# Web configuration
+web:
+  enable_lifecycle: true
+  enable_admin_api: true
+  max_connections: 512
+  read_timeout: 30s

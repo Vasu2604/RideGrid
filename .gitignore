@@ -1,0 +1,51 @@
+# Root .gitignore for RideGrid
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Virtualenv
+pip-log.txt
+
+# Distribution / packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# VSCode
+.vscode/
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Docker
+docker-compose.override.yml
+
+# Sensitive files
+credentials.yml
+secrets.yml
+
+# Mac
+.DS_Store

@@ -1,0 +1,135 @@
+{
+  "dashboard": {
+    "title": "RideGrid - System Overview",
+    "tags": ["ridegrid", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Requests per Second",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{service=~\"ridegrid.*\"}[5m])",
+            "legendFormat": "{{service}} - {{method}} {{endpoint}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 2,
+        "title": "Request Latency (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=~\"ridegrid.*\"}[5m]))",
+            "legendFormat": "{{service}} - p95"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 3,
+        "title": "Active Rides",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(rides{status=\"REQUESTED\"} or rides{status=\"DRIVER_ASSIGNED\"})"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "id": 4,
+        "title": "Active Drivers",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "drivers_active"
+          }
+        ],
+        "gridPos": {"x": 6, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "id": 5,
+        "title": "Queue Depth",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(kafka_consumer_lag)"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "id": 6,
+        "title": "Error Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(errors_total{service=~\"ridegrid.*\"}[5m])"
+          }
+        ],
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "id": 7,
+        "title": "Kafka Consumer Lag",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kafka_consumer_lag",
+            "legendFormat": "{{topic}} - p{{partition}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8}
+      },
+      {
+        "id": 8,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "db_connections_active{service=~\"ridegrid.*\"}",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8}
+      },
+      {
+        "id": 9,
+        "title": "Redis Operations/sec",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(redis_operations_total{service=~\"ridegrid.*\"}[5m])",
+            "legendFormat": "{{service}} - {{operation}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8}
+      },
+      {
+        "id": 10,
+        "title": "Matching Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(matching_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8}
+      }
+    ],
+    "refresh": "5s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    }
+  }
+}
+
+
+
+
+

@@ -1,0 +1,239 @@
+# Prometheus Alerting Rules for RideGrid
+
+groups:
+  - name: ridegrid.slo
+    interval: 30s
+    rules:
+      # SLO: 99.9% Availability
+      - alert: RideGridHighErrorRate
+        expr: ridegrid:http_error_rate_5m > 0.001
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "RideGrid service {{ $labels.job }} has high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+
+      # SLO: P99 < 250ms
+      - alert: RideGridHighLatency
+        expr: ridegrid:http_request_duration_p99 > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "RideGrid service {{ $labels.job }} has high P99 latency"
+          description: "P99 latency is {{ $value }}s for service {{ $labels.job }}"
+
+      # Critical: P99 > 500ms
+      - alert: RideGridCriticalLatency
+        expr: ridegrid:http_request_duration_p99 > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "RideGrid service {{ $labels.job }} has critical latency"
+          description: "P99 latency is {{ $value }}s for service {{ $labels.job }}"
+
+  - name: ridegrid.kafka
+    interval: 30s
+    rules:
+      # Kafka Consumer Lag
+      - alert: KafkaConsumerLagHigh
+        expr: ridegrid:kafka_consumer_lag > 1000
+        for: 2m
+        labels:
+          severity: warning
+          topic: "{{ $labels.topic }}"
+        annotations:
+          summary: "Kafka consumer lag is high for topic {{ $labels.topic }}"
+          description: "Consumer lag is {{ $value }} messages for topic {{ $labels.topic }}"
+
+      # Critical Kafka Consumer Lag
+      - alert: KafkaConsumerLagCritical
+        expr: ridegrid:kafka_consumer_lag > 5000
+        for: 1m
+        labels:
+          severity: critical
+          topic: "{{ $labels.topic }}"
+        annotations:
+          summary: "Kafka consumer lag is critical for topic {{ $labels.topic }}"
+          description: "Consumer lag is {{ $value }} messages for topic {{ $labels.topic }}"
+
+      # Kafka Queue Depth Growing
+      - alert: KafkaQueueDepthGrowing
+        expr: increase(ridegrid:kafka_queue_depth[10m]) > 500
+        for: 5m
+        labels:
+          severity: warning
+          topic: "{{ $labels.topic }}"
+        annotations:
+          summary: "Kafka queue depth growing for topic {{ $labels.topic }}"
+          description: "Queue depth increased by {{ $value }} in last 10 minutes for topic {{ $labels.topic }}"
+
+  - name: ridegrid.business
+    interval: 60s
+    rules:
+      # Low Ride Matching Success Rate
+      - alert: RideMatchingSuccessRateLow
+        expr: ridegrid:ride_matching_success_rate_5m < 0.85
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ride matching success rate is low"
+          description: "Success rate is {{ $value | humanizePercentage }}"
+
+      # Critical Ride Matching Success Rate
+      - alert: RideMatchingSuccessRateCritical
+        expr: ridegrid:ride_matching_success_rate_5m < 0.7
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ride matching success rate is critical"
+          description: "Success rate is {{ $value | humanizePercentage }}"
+
+      # Low Assignment Acceptance Rate
+      - alert: AssignmentAcceptanceRateLow
+        expr: ridegrid:assignment_acceptance_rate_5m < 0.6
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Driver assignment acceptance rate is low"
+          description: "Acceptance rate is {{ $value | humanizePercentage }}"
+
+  - name: ridegrid.infrastructure
+    interval: 30s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Database Connection Pool Exhaustion
+      - alert: DatabasePoolExhaustion
+        expr: ridegrid:db_pool_usage > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Pool usage is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+
+      # Redis Hit Rate Low
+      - alert: RedisHitRateLow
+        expr: ridegrid:redis_hit_rate < 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis cache hit rate is low"
+          description: "Hit rate is {{ $value | humanizePercentage }}"
+
+  - name: ridegrid.services
+    interval: 30s
+    rules:
+      # Service Down
+      - alert: RideGridServiceDown
+        expr: up{job=~"ridegrid-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "RideGrid service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute"
+
+      # Service High Request Rate
+      - alert: ServiceHighRequestRate
+        expr: ridegrid:http_request_rate_5m > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service {{ $labels.job }} has high request rate"
+          description: "Request rate is {{ $value }} req/sec for service {{ $labels.job }}"
+
+      # Service Low Request Rate (possible issue)
+      - alert: ServiceLowRequestRate
+        expr: ridegrid:http_request_rate_5m < 0.1 and ridegrid:http_request_rate_5m > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service {{ $labels.job }} has unusually low request rate"
+          description: "Request rate is {{ $value }} req/sec for service {{ $labels.job }}"
+
+  - name: ridegrid.deadletters
+    interval: 60s
+    rules:
+      # Dead Letter Queue Growing
+      - alert: DeadLetterQueueGrowing
+        expr: increase(kafka_topic_partition_current_offset{topic=~"dlq_.*"}[10m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          topic: "{{ $labels.topic }}"
+        annotations:
+          summary: "Dead letter queue {{ $labels.topic }} is growing"
+          description: "{{ $value }} messages added to DLQ in last 10 minutes"
+
+      # Critical DLQ Growth
+      - alert: DeadLetterQueueCritical
+        expr: increase(kafka_topic_partition_current_offset{topic=~"dlq_.*"}[5m]) > 50
+        for: 1m
+        labels:
+          severity: critical
+          topic: "{{ $labels.topic }}"
+        annotations:
+          summary: "Dead letter queue {{ $labels.topic }} growth is critical"
+          description: "{{ $value }} messages added to DLQ in last 5 minutes"
+
+  - name: ridegrid.security
+    interval: 60s
+    rules:
+      # High Rate of 4xx Errors (potential abuse)
+      - alert: HighClientErrorRate
+        expr: rate(http_requests_total{status=~"4.."}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High rate of 4xx errors for service {{ $labels.job }}"
+          description: "4xx error rate is {{ $value }} req/sec for service {{ $labels.job }}"
+
+      # Authentication Failures
+      - alert: HighAuthFailureRate
+        expr: rate(http_requests_total{status="401"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High authentication failure rate for service {{ $labels.job }}"
+          description: "401 error rate is {{ $value }} req/sec for service {{ $labels.job }}"
