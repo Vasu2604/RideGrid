@@ -1,6 +1,6 @@
 # RideGrid
 
-![RideGrid Logo](images/ridegrid_logo.png "RideGrid - Your City, Your Ride")
+![RideGrid Logo](images/RideGrid.jpeg "RideGrid - Your City, Your Ride")
 
 # RideGrid — A Playbook for Planet-Scale Ride-Hailing
 
